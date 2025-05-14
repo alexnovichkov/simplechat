@@ -36,7 +36,7 @@ private:
     void jsonFromLoggedIn(ServerWorker *sender, const QJsonObject &doc);
     void sendJson(ServerWorker *destination, const QJsonObject &message);
 signals:
-    void logMessage(MessageType type, const QString &msg);
+    void logMessage(Enum::MessageType type, const QString &msg);
     void stopAllClients();
 };
 

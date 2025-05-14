@@ -7,7 +7,7 @@
 #include <QHostAddress>
 #include <QSettings>
 
-inline constexpr int SERVER_PORT = 1967;
+constexpr int SERVER_PORT = 1967;
 
 ChatWindow::ChatWindow(QWidget *parent)
     : QWidget(parent)

@@ -51,7 +51,7 @@ void ChatServer::incomingConnection(qintptr socketDescriptor)
     connect(worker, &ServerWorker::logMessage, this, &ChatServer::logMessage);
     connect(this, &ChatServer::stopAllClients, worker, &ServerWorker::disconnectFromClient);
     m_clients.append(worker);
-    emit logMessage(MessageType::Info, QStringLiteral("New client Connected"));
+    emit logMessage(Enum::MessageType::Info, QStringLiteral("New client Connected"));
 }
 
 void ChatServer::sendJson(ServerWorker *destination, const QJsonObject &message)
@@ -72,7 +72,7 @@ void ChatServer::broadcast(const QJsonObject &message, ServerWorker *exclude)
 void ChatServer::jsonReceived(ServerWorker *sender, const QJsonObject &json)
 {
     Q_ASSERT(sender);
-    emit logMessage(MessageType::Info, QLatin1String("JSON received ")
+    emit logMessage(Enum::MessageType::Info, QLatin1String("JSON received ")
                     + QString::fromUtf8(QJsonDocument(json).toJson()));
     if (sender->userName().isEmpty())
         // a new user is trying to log in
@@ -92,7 +92,7 @@ void ChatServer::userDisconnected(ServerWorker *sender, int threadIdx)
         disconnectedMessage[QStringLiteral("type")] = QStringLiteral("userdisconnected");
         disconnectedMessage[QStringLiteral("username")] = userName;
         broadcast(disconnectedMessage, nullptr);
-        emit logMessage(MessageType::Info, userName + QLatin1String(" disconnected"));
+        emit logMessage(Enum::MessageType::Info, userName + QLatin1String(" disconnected"));
     }
     sender->deleteLater();
 }
@@ -100,7 +100,7 @@ void ChatServer::userDisconnected(ServerWorker *sender, int threadIdx)
 void ChatServer::userError(ServerWorker *sender)
 {
     Q_UNUSED(sender)
-    emit logMessage(MessageType::Critical, QLatin1String("Error from ") + sender->userName());
+    emit logMessage(Enum::MessageType::Critical, QLatin1String("Error from ") + sender->userName());
 }
 
 void ChatServer::stopServer()

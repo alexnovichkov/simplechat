@@ -16,7 +16,7 @@ public:
 private:
     ChatServer *m_chatServer;
 private slots:
-    void logMessage(MessageType type, const QString &msg);
+    void logMessage(Enum::MessageType type, const QString &msg);
 };
 
 #endif // SERVER_H
