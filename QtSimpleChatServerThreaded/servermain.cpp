@@ -7,7 +7,7 @@
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
-    qRegisterMetaType<Enum::MessageType>();
+    qRegisterMetaType<MessageType>();
     Server server;
     server.toggleStartServer();
     return a.exec();

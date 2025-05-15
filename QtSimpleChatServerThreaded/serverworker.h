@@ -28,7 +28,7 @@ signals:
     void jsonReceived(const QJsonObject &jsonDoc);
     void disconnectedFromClient();
     void error();
-    void logMessage(Enum::MessageType type, const QString &msg);
+    void logMessage(MessageType type, const QString &msg);
 private:
     QTcpSocket *m_serverSocket;
     QString m_userName;

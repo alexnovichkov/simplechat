@@ -5,14 +5,11 @@
 
 constexpr int SERVER_PORT = 1967;
 
-namespace Enum {
-    Q_NAMESPACE
-    enum MessageType {
-        Info,
-        Warning,
-        Critical
-    };
-    Q_ENUM_NS(MessageType);
-}
+enum class MessageType {
+    Info,
+    Warning,
+    Critical
+};
+Q_DECLARE_METATYPE(MessageType)
 
 #endif // ENUMS_H

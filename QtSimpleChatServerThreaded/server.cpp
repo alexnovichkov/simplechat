@@ -15,27 +15,27 @@ void Server::toggleStartServer()
 {
     if (m_chatServer->isListening()) {
         m_chatServer->stopServer();
-        logMessage(Enum::MessageType::Info, QStringLiteral("Server Stopped"));
+        logMessage(MessageType::Info, QStringLiteral("Server Stopped"));
     } else {
         if (!m_chatServer->listen(QHostAddress::Any, SERVER_PORT)) {
-            logMessage(Enum::MessageType::Critical, QStringLiteral("Unable to start the server"));
+            logMessage(MessageType::Critical, QStringLiteral("Unable to start the server"));
             return;
         }
-        logMessage(Enum::MessageType::Info, QStringLiteral("Server Started"));
+        logMessage(MessageType::Info, QStringLiteral("Server Started"));
     }
 }
 
-void Server::logMessage(Enum::MessageType type, const QString &msg)
+void Server::logMessage(MessageType type, const QString &msg)
 {
     auto dt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     switch(type) {
-        case Enum::MessageType::Info:
+        case MessageType::Info:
             qDebug()    << dt << QStringLiteral("INFO:   ") << msg;
             break;
-        case Enum::MessageType::Warning:
+        case MessageType::Warning:
             qWarning()  << dt << QStringLiteral("WARNING:") << msg;
             break;
-        case Enum::MessageType::Critical:
+        case MessageType::Critical:
             qCritical() << dt << QStringLiteral("ERROR:  ") << msg;
             break;
     }
