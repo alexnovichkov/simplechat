@@ -6,6 +6,7 @@
 ServerWorker::ServerWorker(QObject *parent)
     : QObject(parent)
     , m_serverSocket(new QTcpSocket(this))
+    , m_uuid{QUuid::createUuid()}
 {
     connect(m_serverSocket, &QTcpSocket::readyRead, this, &ServerWorker::receiveJson);
     connect(m_serverSocket, &QTcpSocket::disconnected, this, &ServerWorker::disconnectedFromClient);
@@ -25,8 +26,7 @@ bool ServerWorker::setSocketDescriptor(qintptr socketDescriptor)
 void ServerWorker::sendJson(const QJsonObject &json)
 {
     const QByteArray jsonData = QJsonDocument(json).toJson();
-    emit logMessage(MessageType::Info, QLatin1String("Sending to ") + userName()
-                    + QLatin1String(" - ") + QString::fromUtf8(jsonData));
+    emit logMessage(MessageType::Info, QLatin1String("Sending to ") + userName());
     QDataStream socketStream(m_serverSocket);
     socketStream.setVersion(QDataStream::Qt_5_7);
     socketStream << jsonData;
@@ -50,6 +50,11 @@ void ServerWorker::setUserName(const QString &userName)
     m_userNameLock.lockForWrite();
     m_userName = userName;
     m_userNameLock.unlock();
+}
+
+QString ServerWorker::uuid() const
+{
+    return m_uuid.toString();
 }
 
 void ServerWorker::receiveJson()

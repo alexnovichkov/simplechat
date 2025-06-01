@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QJsonArray>
 #include <QTimer>
 
 
@@ -54,10 +55,37 @@ void ChatServer::incomingConnection(qintptr socketDescriptor)
     emit logMessage(MessageType::Info, QStringLiteral("New client Connected"));
 }
 
+void ChatServer::send(const QJsonObject &message, const QString &receiverUUid)
+{
+    for (ServerWorker *worker : m_clients) {
+        Q_ASSERT(worker);
+        if (worker->uuid() == receiverUUid) {
+            sendJson(worker, message);
+            break; // we assume that there can only be one worker with the receiverUUid
+        }
+    }
+}
+
 void ChatServer::sendJson(ServerWorker *destination, const QJsonObject &message)
 {
     Q_ASSERT(destination);
     QTimer::singleShot(0, destination, std::bind(&ServerWorker::sendJson, destination, message));
+}
+
+QJsonArray ChatServer::loggedInUsers(ServerWorker *exclude) const
+{
+    QJsonArray users;
+    for (ServerWorker *worker : m_clients) {
+        if (worker == exclude) continue;
+        Q_ASSERT(worker);
+        if (auto name = worker->userName(); !name.isEmpty()) {
+            QJsonObject user;
+            user[QStringLiteral("userName")] = name;
+            user[QStringLiteral("uuid")] = worker->uuid();
+            users.append(user);
+        }
+    }
+    return users;
 }
 
 void ChatServer::broadcast(const QJsonObject &message, ServerWorker *exclude)
@@ -91,6 +119,7 @@ void ChatServer::userDisconnected(ServerWorker *sender, int threadIdx)
         QJsonObject disconnectedMessage;
         disconnectedMessage[QStringLiteral("type")] = QStringLiteral("userdisconnected");
         disconnectedMessage[QStringLiteral("username")] = userName;
+        disconnectedMessage[QStringLiteral("uuid")] = sender->uuid();
         broadcast(disconnectedMessage, nullptr);
         emit logMessage(MessageType::Info, userName + QLatin1String(" disconnected"));
     }
@@ -135,30 +164,26 @@ void ChatServer::jsonFromLoggedOut(ServerWorker *sender, const QJsonObject &docO
     }
 
     sender->setUserName(newUserName);
+
+    // send back the login sucess
     QJsonObject successMessage;
     successMessage[QStringLiteral("type")] = QStringLiteral("login");
     successMessage[QStringLiteral("success")] = true;
-    sendJson(sender, successMessage); // send back the login sucess
+    sendJson(sender, successMessage);
 
-    QJsonObject connectedMessage;
-    connectedMessage[QStringLiteral("type")] = QStringLiteral("newuser");
-    connectedMessage[QStringLiteral("username")] = newUserName;
-    broadcast(connectedMessage, sender); // broadcast the new user
+    // broadcast the new user
+    QJsonObject newUserMessage;
+    newUserMessage[QStringLiteral("type")] = QStringLiteral("newuser");
+    newUserMessage[QStringLiteral("username")] = newUserName;
+    broadcast(newUserMessage, sender);
 
-    //
-    if (m_clients.size() == 2) {
-        QString oldUserName;
-        for (ServerWorker *worker : qAsConst(m_clients)) {
-            if (worker != sender) {
-                oldUserName = worker->userName();
-            }
-        }
-        if (!oldUserName.isEmpty()) {
-            QJsonObject connectedMessage;
-            connectedMessage[QStringLiteral("type")] = QStringLiteral("newuser");
-            connectedMessage[QStringLiteral("username")] = oldUserName;
-            sendJson(sender, connectedMessage);
-        }
+    // send back the list of logged-in users
+    const auto users = loggedInUsers(sender);
+    if (!users.isEmpty()) {
+        QJsonObject connectedMessage;
+        connectedMessage[QStringLiteral("type")] = QStringLiteral("users");
+        connectedMessage[QStringLiteral("users")] = users;
+        sendJson(sender, connectedMessage);
     }
 }
 
@@ -169,7 +194,11 @@ void ChatServer::jsonFromLoggedIn(ServerWorker *sender, const QJsonObject &docOb
     // broadcast the message with additional info on the sender
     QJsonObject message = docObj;
     message[QStringLiteral("sender")] = sender->userName();
-    broadcast(message, sender); // broadcast the text to all users in the chat
+    auto receiver = docObj.value(QStringLiteral("receiver")).toString();
+    if (receiver == QLatin1String("all") || receiver.isEmpty())
+        broadcast(message, sender); // broadcast the message to all users in the chat
+    else
+        send(message, receiver); // send the message to a receiver only
 }
 
 

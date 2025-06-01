@@ -2,7 +2,7 @@ QT += core network
 
 TARGET = chatserver
 # minimal c++ version is c++11
-CONFIG *= c++11
+CONFIG *= c++17
 CONFIG *= warn_on
 CONFIG *= release
 
