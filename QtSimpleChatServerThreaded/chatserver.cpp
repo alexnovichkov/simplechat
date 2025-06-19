@@ -88,10 +88,10 @@ QJsonArray ChatServer::loggedInUsers(ServerWorker *exclude) const
         if (worker == exclude) continue;
         Q_ASSERT(worker);
         if (auto name = worker->userName(); !name.isEmpty()) {
-            QJsonObject user;
-            user[QStringLiteral("userName")] = name;
-            user[QStringLiteral("uid")] = worker->uid();
-            users.append(user);
+            // QJsonObject user;
+            // user[QStringLiteral("userName")] = name;
+            // user[QStringLiteral("uid")] = worker->uid();
+            users.append(name+"\n"+worker->uid());
         }
     }
     return users;
