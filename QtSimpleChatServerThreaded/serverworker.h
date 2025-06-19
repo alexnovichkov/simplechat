@@ -20,7 +20,8 @@ public:
     virtual bool setSocketDescriptor(qintptr socketDescriptor);
     QString userName() const;
     void setUserName(const QString &userName);
-    QString uuid() const;
+    QString uid() const;
+    void setUid(const QString &uid);
     void sendJson(const QJsonObject &json);
 public slots:
     void disconnectFromClient();
@@ -35,7 +36,8 @@ private:
     QTcpSocket *m_serverSocket;
     QString m_userName;
     mutable QReadWriteLock m_userNameLock;
-    QUuid m_uuid;
+    mutable QReadWriteLock m_uidLock;
+    QString m_uid;
 };
 
 #endif // SERVERWORKER_H

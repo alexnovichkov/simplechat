@@ -6,7 +6,6 @@
 ServerWorker::ServerWorker(QObject *parent)
     : QObject(parent)
     , m_serverSocket(new QTcpSocket(this))
-    , m_uuid{QUuid::createUuid()}
 {
     connect(m_serverSocket, &QTcpSocket::readyRead, this, &ServerWorker::receiveJson);
     connect(m_serverSocket, &QTcpSocket::disconnected, this, &ServerWorker::disconnectedFromClient);
@@ -52,9 +51,20 @@ void ServerWorker::setUserName(const QString &userName)
     m_userNameLock.unlock();
 }
 
-QString ServerWorker::uuid() const
+QString ServerWorker::uid() const
 {
-    return m_uuid.toString();
+    m_uidLock.lockForRead();
+    const QString result = m_uid;
+    m_uidLock.unlock();
+    return result;
+}
+
+void ServerWorker::setUid(
+    const QString &uid)
+{
+    m_uidLock.lockForWrite();
+    m_uid = uid;
+    m_uidLock.unlock();
 }
 
 void ServerWorker::receiveJson()

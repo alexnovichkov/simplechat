@@ -25,7 +25,7 @@ private:
     QVector<int> m_threadsLoad;
     QVector<ServerWorker *> m_clients;
 private slots:
-    void send(const QJsonObject &message, const QString &receiverUUid);
+    void send(const QJsonObject &message, const QString &receiverUid);
     void broadcast(const QJsonObject &message, ServerWorker *exclude);
     void jsonReceived(ServerWorker *sender, const QJsonObject &doc);
     void userDisconnected(ServerWorker *sender, int threadIdx);
