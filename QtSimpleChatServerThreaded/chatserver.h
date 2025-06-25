@@ -29,7 +29,7 @@ private slots:
     void broadcast(const QJsonObject &message, ServerWorker *exclude);
     void jsonReceived(ServerWorker *sender, const QJsonObject &doc);
     void userDisconnected(ServerWorker *sender, int threadIdx);
-    void userError(ServerWorker *sender);
+    void userError(ServerWorker *sender, int error);
 public slots:
     void stopServer();
 private:

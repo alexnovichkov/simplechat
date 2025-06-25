@@ -30,7 +30,7 @@ private slots:
 signals:
     void jsonReceived(const QJsonObject &jsonDoc);
     void disconnectedFromClient();
-    void error();
+    void error(int errorCode);
     void logMessage(MessageType type, const QString &msg);
 private:
     QTcpSocket *m_serverSocket;

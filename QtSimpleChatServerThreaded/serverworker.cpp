@@ -12,7 +12,9 @@ ServerWorker::ServerWorker(QObject *parent)
 #if (QT_VERSION < QT_VERSION_CHECK(5, 15, 0))
     connect(m_serverSocket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error), this, &ServerWorker::error);
 #else
-    connect(m_serverSocket, &QAbstractSocket::errorOccurred, this, &ServerWorker::error);
+    connect(m_serverSocket, &QAbstractSocket::errorOccurred, this, [this](QAbstractSocket::SocketError error){
+        emit this->error(static_cast<int>(error));
+    });
 #endif
 }
 
@@ -25,7 +27,6 @@ bool ServerWorker::setSocketDescriptor(qintptr socketDescriptor)
 void ServerWorker::sendJson(const QJsonObject &json)
 {
     const QByteArray jsonData = QJsonDocument(json).toJson();
-    emit logMessage(MessageType::Info, QLatin1String("Sending to ") + userName());
     QDataStream socketStream(m_serverSocket);
     socketStream.setVersion(QDataStream::Qt_5_7);
     socketStream << jsonData;
