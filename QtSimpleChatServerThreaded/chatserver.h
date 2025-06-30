@@ -3,6 +3,7 @@
 
 #include <QTcpServer>
 #include <QVector>
+#include <QTimer>
 
 class QThread;
 class ServerWorker;
@@ -24,6 +25,7 @@ private:
     QVector<QThread *> m_availableThreads;
     QVector<int> m_threadsLoad;
     QVector<ServerWorker *> m_clients;
+    QTimer timer;
 private slots:
     void send(const QJsonObject &message, const QString &receiverUid);
     void broadcast(const QJsonObject &message, ServerWorker *exclude);

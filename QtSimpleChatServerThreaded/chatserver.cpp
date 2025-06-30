@@ -30,13 +30,7 @@ void ChatServer::incomingConnection(qintptr socketDescriptor)
     emit logMessage(MessageType::Info,
                     QStringLiteral("Incoming connection from %1...").arg(socketDescriptor));
     ServerWorker *worker = new ServerWorker;
-    if (!worker->setSocketDescriptor(socketDescriptor)) {
-        emit logMessage(MessageType::Critical,
-                        QStringLiteral("Error in setting the connection "
-                                       "with socket descriptor %1.").arg(socketDescriptor));
-        worker->deleteLater();
-        return;
-    }
+
     int threadIdx = m_availableThreads.size();
     if (threadIdx < m_idealThreadCount) { //we can add a new thread
         m_availableThreads.append(new QThread(this));
@@ -47,6 +41,15 @@ void ChatServer::incomingConnection(qintptr socketDescriptor)
         threadIdx = std::distance(m_threadsLoad.cbegin(), std::min_element(m_threadsLoad.cbegin(), m_threadsLoad.cend()));
         ++m_threadsLoad[threadIdx];
     }
+
+    if (!worker->setSocketDescriptor(socketDescriptor)) {
+        emit logMessage(MessageType::Critical,
+                        QStringLiteral("Error in setting the connection "
+                                       "with socket descriptor %1.").arg(socketDescriptor));
+        worker->deleteLater();
+        return;
+    }
+
     worker->moveToThread(m_availableThreads.at(threadIdx));
     connect(m_availableThreads.at(threadIdx), &QThread::finished, worker, &QObject::deleteLater);
     connect(worker, &ServerWorker::disconnectedFromClient, this,
@@ -56,6 +59,7 @@ void ChatServer::incomingConnection(qintptr socketDescriptor)
             std::bind(&ChatServer::jsonReceived, this, worker, std::placeholders::_1));
     connect(worker, &ServerWorker::logMessage, this, &ChatServer::logMessage);
     connect(this, &ChatServer::stopAllClients, worker, &ServerWorker::disconnectFromClient);
+
     m_clients.append(worker);
     emit logMessage(MessageType::Info, QStringLiteral("New client connected from %1").arg(socketDescriptor));
 }
@@ -113,6 +117,23 @@ void ChatServer::jsonReceived(ServerWorker *sender, const QJsonObject &json)
                     QLatin1String("JSON received \"%1\" from %2")
                         .arg(json[QStringLiteral("type")].toString())
                         .arg(sender->uid()));
+
+    // Проверяем, приходило ли уже такое сообщение
+    const int messageID = json.value(QLatin1String("messageID")).toInt();
+    if (sender->messageProcessed(messageID)) {
+        return; // Сообщение уже обработано
+    }
+
+    // Посылаем обратно, что сообщение получено
+    const auto type = json.value(QLatin1String("type")).toString();
+    if (!type.isEmpty()) {
+        sender->addMessage(messageID);
+        QJsonObject message;
+        message[QStringLiteral("type")] = type;
+        message[QStringLiteral("received")] = true;
+        sendJson(sender, message);
+    }
+
     if (sender->userName().isEmpty())
         // a new user is trying to log in
         jsonFromLoggedOut(sender, json);
@@ -121,17 +142,100 @@ void ChatServer::jsonReceived(ServerWorker *sender, const QJsonObject &json)
         jsonFromLoggedIn(sender, json);
 }
 
+void ChatServer::jsonFromLoggedOut(ServerWorker *sender, const QJsonObject &docObj)
+{
+    Q_ASSERT(sender);
+    const auto type = docObj.value(QLatin1String("type")).toString();
+    if (type.toLower() != QStringLiteral("login")) {
+        emit logMessage(MessageType::Warning,
+                        QStringLiteral("Wrong message \"%1\" from an unauthorized client.")
+                            .arg(type));
+        return;
+    }
+
+    const auto userName = docObj.value(QLatin1String("username")).toString().simplified();
+    if (userName.isEmpty()) {
+        emit logMessage(MessageType::Warning,
+                        QStringLiteral("New client \"%1\" has empty username.")
+                            .arg(sender->uid()));
+        return;
+    }
+    const auto userUid = docObj.value(QLatin1String("uid")).toString();
+    if (userUid.isEmpty()) {
+        emit logMessage(MessageType::Warning,
+                        QStringLiteral("New client \"%1\" has empty uid.")
+                            .arg(userName));
+        return;
+    }
+
+    // search for duplicate username
+    for (ServerWorker *worker : qAsConst(m_clients)) {
+        if (worker != sender) {
+            if (worker->userName() == userName) {
+                QJsonObject message;
+                message[QStringLiteral("type")] = QStringLiteral("login");
+                message[QStringLiteral("success")] = false;
+                message[QStringLiteral("reason")] = QStringLiteral("duplicate username");
+                sendJson(sender, message);
+                emit logMessage(MessageType::Critical,
+                                QStringLiteral("Clients %1 and %2 have duplicate username \"%3\".")
+                                    .arg(worker->uid())
+                                    .arg(sender->uid())
+                                    .arg(userName));
+                return;
+            }
+        }
+    }
+
+    sender->setUserName(userName);
+    sender->setUid(userUid);
+
+    // send back the login sucess
+    QJsonObject successMessage;
+    successMessage[QStringLiteral("type")] = QStringLiteral("login");
+    successMessage[QStringLiteral("success")] = true;
+    const auto users = loggedInUsers(sender);
+    if (!users.isEmpty())
+        successMessage[QStringLiteral("users")] = users;
+    sendJson(sender, successMessage);
+
+    // broadcast the new user
+    QJsonObject newUserMessage;
+    newUserMessage[QStringLiteral("type")] = QStringLiteral("newuser");
+    newUserMessage[QStringLiteral("username")] = userName;
+    newUserMessage[QStringLiteral("uid")] = userUid;
+    broadcast(newUserMessage, sender);
+    emit logMessage(MessageType::Info,
+                    QStringLiteral("Login successful: %1 as \"%2\"")
+                        .arg(userUid)
+                        .arg(userName));
+}
+
+void ChatServer::jsonFromLoggedIn(ServerWorker *sender, const QJsonObject &docObj)
+{
+    Q_ASSERT(sender);
+
+    QJsonObject message = docObj;
+    message[QStringLiteral("sender")] = sender->userName();
+    message[QLatin1String("senderUid")] = sender->uid();
+    auto receiver = docObj.value(QStringLiteral("receiver")).toString();
+    if (receiver == QLatin1String("all") || receiver.isEmpty())
+        broadcast(message, sender); // broadcast the message to all users in the chat
+    else
+        send(message, receiver); // send the message to a receiver only
+}
+
 void ChatServer::userDisconnected(ServerWorker *sender, int threadIdx)
 {
     --m_threadsLoad[threadIdx];
     m_clients.removeAll(sender);
     const QString userName = sender->userName();
     if (!userName.isEmpty()) {
-        QJsonObject disconnectedMessage;
-        disconnectedMessage[QStringLiteral("type")] = QStringLiteral("userdisconnected");
-        disconnectedMessage[QStringLiteral("username")] = userName;
-        disconnectedMessage[QStringLiteral("uid")] = sender->uid();
-        broadcast(disconnectedMessage, nullptr);
+        QJsonObject message;
+        message[QStringLiteral("type")] = QStringLiteral("userdisconnected");
+        message[QStringLiteral("username")] = userName;
+        message[QStringLiteral("uid")] = sender->uid();
+        broadcast(message, nullptr);
         emit logMessage(MessageType::Info, sender->uid() + QLatin1String(" disconnected"));
     }
     sender->deleteLater();
@@ -150,89 +254,3 @@ void ChatServer::stopServer()
     emit stopAllClients();
     close();
 }
-
-void ChatServer::jsonFromLoggedOut(ServerWorker *sender, const QJsonObject &docObj)
-{
-    Q_ASSERT(sender);
-    const auto typeVal = docObj.value(QLatin1String("type")).toString();
-    if (typeVal.toLower() != QStringLiteral("login")) {
-        emit logMessage(MessageType::Warning,
-                        QStringLiteral("Wrong message \"%1\" from an unauthorized client.")
-                            .arg(typeVal));
-        return;
-    }
-
-    const auto newUserName = docObj.value(QLatin1String("username")).toString().simplified();
-    if (newUserName.isEmpty()) {
-        emit logMessage(MessageType::Warning,
-                        QStringLiteral("New client \"%1\" has empty username.")
-                            .arg(sender->uid()));
-        return;
-    }
-    const auto userUid = docObj.value(QLatin1String("uid")).toString();
-    if (userUid.isEmpty()) {
-        emit logMessage(MessageType::Warning,
-                        QStringLiteral("New client \"%1\" has empty uid.")
-                            .arg(newUserName));
-        return;
-    }
-
-    // search for duplicate username
-    for (ServerWorker *worker : qAsConst(m_clients)) {
-        if (worker != sender) {
-            if (worker->userName() == newUserName) {
-                QJsonObject message;
-                message[QStringLiteral("type")] = QStringLiteral("login");
-                message[QStringLiteral("success")] = false;
-                message[QStringLiteral("reason")] = QStringLiteral("duplicate username");
-                sendJson(sender, message);
-                emit logMessage(MessageType::Critical,
-                                QStringLiteral("Clients %1 and %2 have duplicate username \"%3\".")
-                                    .arg(worker->uid())
-                                    .arg(sender->uid())
-                                    .arg(newUserName));
-                return;
-            }
-        }
-    }
-
-    sender->setUserName(newUserName);
-    sender->setUid(userUid);
-
-    // send back the login sucess
-    QJsonObject successMessage;
-    successMessage[QStringLiteral("type")] = QStringLiteral("login");
-    successMessage[QStringLiteral("success")] = true;
-    const auto users = loggedInUsers(sender);
-    if (!users.isEmpty())
-        successMessage[QStringLiteral("users")] = users;
-    sendJson(sender, successMessage);
-
-    // broadcast the new user
-    QJsonObject newUserMessage;
-    newUserMessage[QStringLiteral("type")] = QStringLiteral("newuser");
-    newUserMessage[QStringLiteral("username")] = newUserName;
-    newUserMessage[QStringLiteral("uid")] = userUid;
-    broadcast(newUserMessage, sender);
-    emit logMessage(MessageType::Info,
-                    QStringLiteral("Login successful: %1 as \"%2\"")
-                        .arg(userUid)
-                        .arg(newUserName));
-}
-
-void ChatServer::jsonFromLoggedIn(ServerWorker *sender, const QJsonObject &docObj)
-{
-    Q_ASSERT(sender);
-
-    // broadcast the message with additional info on the sender
-    QJsonObject message = docObj;
-    message[QStringLiteral("sender")] = sender->userName();
-    message[QLatin1String("senderUid")] = sender->uid();
-    auto receiver = docObj.value(QStringLiteral("receiver")).toString();
-    if (receiver == QLatin1String("all") || receiver.isEmpty())
-        broadcast(message, sender); // broadcast the message to all users in the chat
-    else
-        send(message, receiver); // send the message to a receiver only
-}
-
-

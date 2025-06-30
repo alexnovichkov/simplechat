@@ -5,6 +5,7 @@
 #include <QTcpSocket>
 #include <QReadWriteLock>
 #include <QUuid>
+#include <QSet>
 
 #include "enums.h"
 
@@ -23,6 +24,9 @@ public:
     QString uid() const;
     void setUid(const QString &uid);
     void sendJson(const QJsonObject &json);
+
+    bool messageProcessed(int messageID) const;
+    void addMessage(int messageID);
 public slots:
     void disconnectFromClient();
 private slots:
@@ -35,9 +39,11 @@ signals:
 private:
     QTcpSocket *m_serverSocket;
     QString m_userName;
+    QString m_uid;
+    QSet<int> m_messages;
     mutable QReadWriteLock m_userNameLock;
     mutable QReadWriteLock m_uidLock;
-    QString m_uid;
+    mutable QReadWriteLock m_messagesLock;
 };
 
 #endif // SERVERWORKER_H

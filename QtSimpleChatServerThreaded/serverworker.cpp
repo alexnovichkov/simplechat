@@ -32,6 +32,21 @@ void ServerWorker::sendJson(const QJsonObject &json)
     socketStream << jsonData;
 }
 
+bool ServerWorker::messageProcessed(int messageID) const
+{
+    m_messagesLock.lockForRead();
+    const bool processed = m_messages.contains(messageID);
+    m_messagesLock.unlock();
+    return processed;
+}
+
+void ServerWorker::addMessage(int messageID)
+{
+    m_messagesLock.lockForWrite();
+    m_messages.insert(messageID);
+    m_messagesLock.unlock();
+}
+
 void ServerWorker::disconnectFromClient()
 {
     m_serverSocket->disconnectFromHost();

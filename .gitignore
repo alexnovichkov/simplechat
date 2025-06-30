@@ -433,3 +433,4 @@ target_wrapper.*
 # QtCtreator CMake
 CMakeLists.txt.user*
 /docs/htmldocs.html
+/QtSimpleChatServerThreaded/build
