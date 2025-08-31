@@ -4,10 +4,10 @@
 #include <QTcpServer>
 #include <QVector>
 #include <QTimer>
+#include <QReadWriteLock>
 
 class QThread;
 class ServerWorker;
-class QJsonObject;
 
 #include "enums.h"
 
@@ -26,19 +26,20 @@ private:
     QVector<int> m_threadsLoad;
     QVector<ServerWorker *> m_clients;
     QTimer timer;
+    mutable QReadWriteLock m_clientsLock;
 private slots:
-    void send(const QJsonObject &message, const QString &receiverUid);
-    void broadcast(const QJsonObject &message, ServerWorker *exclude);
-    void jsonReceived(ServerWorker *sender, const QJsonObject &doc);
+    void send(const QMap<int, QVariant> &message, const QString &receiverUid);
+    void broadcast(const QMap<int, QVariant> &message, ServerWorker *exclude);
+    void dataReceived(const QMap<int, QVariant> &data);
     void userDisconnected(ServerWorker *sender, int threadIdx);
     void userError(ServerWorker *sender, int error);
 public slots:
     void stopServer();
 private:
-    void jsonFromLoggedOut(ServerWorker *sender, const QJsonObject &doc);
-    void jsonFromLoggedIn(ServerWorker *sender, const QJsonObject &doc);
-    void sendJson(ServerWorker *destination, const QJsonObject &message);
-    QJsonArray loggedInUsers(ServerWorker *exclude) const;
+    void dataFromLoggedOut(ServerWorker *sender, const QMap<int, QVariant> &data);
+    void dataFromLoggedIn(ServerWorker *sender, const QMap<int, QVariant> &data);
+    void sendData(ServerWorker *destination, const QMap<int, QVariant> &data);
+    QVariantList loggedInUsers(ServerWorker *exclude) const;
 signals:
     void logMessage(MessageType type, const QString &msg);
     void stopAllClients();
