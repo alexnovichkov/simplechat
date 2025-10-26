@@ -25,6 +25,7 @@ enum Type {
     Success, //bool
     Reason, //string
     Users,//list
+    Status,//int
     Unknown = 65535
 };
 

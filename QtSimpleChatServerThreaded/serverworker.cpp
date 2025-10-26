@@ -157,6 +157,14 @@ void ServerWorker::setUid(
     m_uidLock.unlock();
 }
 
+int ServerWorker::status() const
+{
+    m_statusLock.lockForRead();
+    const int result = m_status;
+    m_statusLock.unlock();
+    return result;
+}
+
 void ServerWorker::receiveData()
 {
     m_reader.reparse();
@@ -257,6 +265,11 @@ void ServerWorker::receiveData()
             if (m_leftToRead == 0) {
                 m_reader.leaveContainer();
                 // qDebug() << "The total message data:"<<m_receivedData;
+                if (m_receivedData.contains(Type::Status)) {
+                    m_statusLock.lockForWrite();
+                    m_status = m_receivedData[Type::Status].toInt();
+                    m_statusLock.unlock();
+                }
                 emit dataReceived(m_receivedData);
             }
             m_lastMessageType = Unknown;

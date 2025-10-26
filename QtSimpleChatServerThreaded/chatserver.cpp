@@ -106,7 +106,7 @@ QVariantList ChatServer::loggedInUsers(ServerWorker *exclude) const
         if (worker == exclude) continue;
         Q_ASSERT(worker);
         if (auto name = worker->userName(); !name.isEmpty())
-            users.append(name+"\n"+worker->uid());
+            users.append(QString("%1\n%2\n%3").arg(name).arg(worker->uid()).arg(worker->status()));
     }
     return users;
 }

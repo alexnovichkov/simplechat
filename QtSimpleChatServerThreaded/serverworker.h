@@ -25,6 +25,7 @@ public:
     void setUserName(const QString &userName);
     QString uid() const;
     void setUid(const QString &uid);
+    int status() const;
     void sendData(const QMap<int, QVariant> &data);
 
     // bool messageProcessed(int messageID) const;
@@ -51,8 +52,10 @@ private:
 
     QString m_userName;
     QString m_uid;
+    int m_status{0}; //offline
     mutable QReadWriteLock m_userNameLock;
     mutable QReadWriteLock m_uidLock;
+    mutable QReadWriteLock m_statusLock;
 
     Type m_lastMessageType {Type::Unknown};
     QMap<int, QVariant> m_receivedData;
